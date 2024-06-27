@@ -1,0 +1,40 @@
+node {
+    def mavenHome = tool name: 'Maven3.9.6'
+ 
+    stage('1 Clone Code') {
+        git 'https://github.com/Feykendra/maven-web-application'
+    }
+ 
+    stage('2 Test & Build') {
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+ 
+    stage('3 Code Quality') {
+        sh "${mavenHome}/bin/mvn sonar:sonar"
+    }
+ 
+    stage('4 Upload Artifacts') {
+        sh "${mavenHome}/bin/mvn deploy"
+    }
+ 
+    stage('5 Deploy to UAT') {
+	sh "echo 'Deploy to UAT'"
+       deploy adapters: [tomcat9(credentialsId: 'tomcatcredentials', path: '', url: 'http://172.31.29.234:8177/')], contextPath: null, onFailure: false, war: 'target/*war'
+    }
+ 
+    stage('6 Approval Gate') {
+        sh "echo 'Ready for review'"
+        timeout(time: 2, unit: 'DAYS') {
+            input message: 'Application ready for deployment, please review and approve'
+        }
+    }
+ 
+    stage('7 Deploy to Prod') {
+        sh "sleep 50"
+       deploy adapters: [tomcat9(credentialsId: 'tomcatcredentials', path: '', url: 'http://172.31.29.234:8177/')], contextPath: null, onFailure: false, war: 'target/*war'
+    }
+ 
+    stage('8 Email Notification') {
+        emailext body: 'Project is Up and Running. Please test and repport for errors', recipientProviders: [buildUser(), developers()], subject: 'Project is Up and Running', to: 'feyisayoadejobi@yahoo.com'
+    }
+}
